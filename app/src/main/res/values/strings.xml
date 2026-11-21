@@ -784,5 +784,9 @@
     </plurals>
     <string name="socks5" translatable="false">SOCKS5</string>
     <string name="http" translatable="false">HTTP</string>
+    <string name="rename">Rename</string>
+    <string name="rename_tunnel">Rename tunnel</string>
+    <string name="tunnel_name_empty">Tunnel name cannot be empty</string>
+    <string name="tunnel_name_reserved">This tunnel name is reserved</string>
     <string name="tunnel_copied_same_keys">Tunnel copied with the same keys. Don\'t run both at the same time.</string>
 </resources>

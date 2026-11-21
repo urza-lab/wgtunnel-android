@@ -1,5 +1,30 @@
 package com.zaneschepke.wireguardautotunnel.domain.model
 
+import com.zaneschepke.wireguardautotunnel.data.entity.TunnelConfig.Companion.GLOBAL_CONFIG_NAME
+
+enum class TunnelRenameError {
+    EMPTY,
+    RESERVED,
+    TAKEN,
+    RUNNING,
+}
+
+/** Returns why [newName] can't be applied, or null when the rename is allowed. */
+fun validateTunnelRename(
+    newName: String,
+    otherTunnelNames: Collection<String>,
+    isRunning: Boolean,
+): TunnelRenameError? {
+    val name = newName.trim()
+    return when {
+        isRunning -> TunnelRenameError.RUNNING
+        name.isEmpty() -> TunnelRenameError.EMPTY
+        name == GLOBAL_CONFIG_NAME -> TunnelRenameError.RESERVED
+        name in otherTunnelNames -> TunnelRenameError.TAKEN
+        else -> null
+    }
+}
+
 /** Keeps the id, so default flags and auto-tunnel mappings stay attached to this tunnel. */
 fun TunnelConfig.renamedTo(newName: String): TunnelConfig {
     val name = newName.trim()

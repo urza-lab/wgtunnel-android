@@ -20,7 +20,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.dokar.sonner.ToastType
 import com.zaneschepke.wireguardautotunnel.R
+import com.zaneschepke.wireguardautotunnel.domain.model.TunnelConfig
 import com.zaneschepke.wireguardautotunnel.domain.model.TunnelGroup
+import com.zaneschepke.wireguardautotunnel.domain.model.validateTunnelRename
 import com.zaneschepke.wireguardautotunnel.ui.LocalIsAndroidTV
 import com.zaneschepke.wireguardautotunnel.ui.LocalNavController
 import com.zaneschepke.wireguardautotunnel.ui.common.dialog.InfoDialog
@@ -35,6 +37,7 @@ import com.zaneschepke.wireguardautotunnel.ui.screens.tunnels.components.GroupSe
 import com.zaneschepke.wireguardautotunnel.ui.screens.tunnels.components.SelectionActionsSheet
 import com.zaneschepke.wireguardautotunnel.ui.screens.tunnels.components.TunnelImportSheet
 import com.zaneschepke.wireguardautotunnel.ui.screens.tunnels.components.TunnelList
+import com.zaneschepke.wireguardautotunnel.ui.screens.tunnels.components.TunnelNameDialog
 import com.zaneschepke.wireguardautotunnel.ui.screens.tunnels.components.UrlImportDialog
 import com.zaneschepke.wireguardautotunnel.ui.sideeffect.LocalSideEffect
 import com.zaneschepke.wireguardautotunnel.util.FileUtils
@@ -80,6 +83,7 @@ fun TunnelsScreen(sharedViewModel: SharedAppViewModel = koinActivityViewModel())
     var showSelectionActions by rememberSaveable { mutableStateOf(false) }
     var showReorderActions by rememberSaveable { mutableStateOf(false) }
     var renameGroup by remember { mutableStateOf<TunnelGroup?>(null) }
+    var renameTunnel by remember { mutableStateOf<TunnelConfig?>(null) }
     var deleteGroup by remember { mutableStateOf<TunnelGroup?>(null) }
     var deleteGroupAndTunnels by remember { mutableStateOf<TunnelGroup?>(null) }
     var exportGroup by remember { mutableStateOf<TunnelGroup?>(null) }
@@ -237,6 +241,24 @@ fun TunnelsScreen(sharedViewModel: SharedAppViewModel = koinActivityViewModel())
         )
     }
 
+    renameTunnel?.let { tunnel ->
+        TunnelNameDialog(
+            initialName = tunnel.name,
+            validate = { name ->
+                validateTunnelRename(
+                    name,
+                    uiState.tunnels.filter { it.id != tunnel.id }.map { it.name },
+                    uiState.backendStatus.activeTunnels.containsKey(tunnel.id),
+                )
+            },
+            onDismiss = { renameTunnel = null },
+            onConfirm = { name ->
+                sharedViewModel.renameTunnel(tunnel.id, name)
+                renameTunnel = null
+            },
+        )
+    }
+
     if (showMoveToGroup) {
         GroupSelectionSheet(
             groups = uiState.groups,
@@ -263,6 +285,18 @@ fun TunnelsScreen(sharedViewModel: SharedAppViewModel = koinActivityViewModel())
                 }
             },
             onCopy = sharedViewModel::copySelectedTunnel,
+            onRename = {
+                uiState.selectedTunnels.singleOrNull()?.let { tunnel ->
+                    if (uiState.backendStatus.activeTunnels.containsKey(tunnel.id)) {
+                        sharedViewModel.showSnackMessage(
+                            StringValue.StringResource(R.string.tunnel_running_name_message),
+                            ToastType.Warning,
+                        )
+                    } else {
+                        renameTunnel = tunnel
+                    }
+                }
+            },
             onDelete = { showDeleteModal = true },
             onRenameGroup = { renameGroup = it },
             onExportGroup = { group ->

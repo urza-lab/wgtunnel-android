@@ -26,6 +26,7 @@ fun SelectionActionsSheet(
     onUngroup: () -> Unit,
     onExport: () -> Unit,
     onCopy: () -> Unit,
+    onRename: () -> Unit,
     onDelete: () -> Unit,
     onRenameGroup: (TunnelGroup) -> Unit,
     onExportGroup: (TunnelGroup) -> Unit,
@@ -118,6 +119,16 @@ fun SelectionActionsSheet(
                     ),
                 )
                 if (uiState.canCopy) {
+                    add(
+                        SheetOption(
+                            Icons.Outlined.Edit,
+                            stringResource(R.string.rename),
+                            onClick = {
+                                onDismiss()
+                                onRename()
+                            },
+                        ),
+                    )
                     add(
                         SheetOption(
                             Icons.Outlined.CopyAll,

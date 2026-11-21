@@ -18,6 +18,8 @@ import com.zaneschepke.wireguardautotunnel.domain.enums.TunnelMode
 import com.zaneschepke.wireguardautotunnel.domain.model.TunnelConfig
 import com.zaneschepke.wireguardautotunnel.domain.model.TunnelGroup
 import com.zaneschepke.wireguardautotunnel.domain.model.duplicatedAs
+import com.zaneschepke.wireguardautotunnel.domain.model.renamedTo
+import com.zaneschepke.wireguardautotunnel.domain.model.validateTunnelRename
 import com.zaneschepke.wireguardautotunnel.domain.repository.AppStateRepository
 import com.zaneschepke.wireguardautotunnel.domain.repository.GeneralSettingRepository
 import com.zaneschepke.wireguardautotunnel.domain.repository.GlobalEffectRepository
@@ -29,6 +31,7 @@ import com.zaneschepke.wireguardautotunnel.domain.sideeffect.GlobalSideEffect
 import com.zaneschepke.wireguardautotunnel.domain.sideeffect.NotificationPendingAction
 import com.zaneschepke.wireguardautotunnel.service.ServiceManager
 import com.zaneschepke.wireguardautotunnel.service.autotunnel.AutoTunnelStateHolder
+import com.zaneschepke.wireguardautotunnel.ui.screens.tunnels.components.messageRes
 import com.zaneschepke.wireguardautotunnel.ui.sideeffect.LocalSideEffect
 import com.zaneschepke.wireguardautotunnel.ui.state.DisplayTunnelState
 import com.zaneschepke.wireguardautotunnel.ui.state.GlobalAppUiState
@@ -851,6 +854,24 @@ class SharedAppViewModel(
                 ToastType.Info,
             ),
         )
+    }
+
+    fun renameTunnel(tunnelId: Int, newName: String) = intent {
+        val tunnel = tunnelRepository.getById(tunnelId) ?: return@intent
+        val otherNames = tunnelRepository.getAll().filter { it.id != tunnelId }.map { it.name }
+        val isRunning = tunnelsUiState.value.backendStatus.activeTunnels.containsKey(tunnelId)
+        val error = validateTunnelRename(newName, otherNames, isRunning)
+        if (error != null) {
+            postGlobalSideEffect(
+                GlobalSideEffect.Snackbar(
+                    StringValue.StringResource(error.messageRes),
+                    ToastType.Error,
+                ),
+            )
+            return@intent
+        }
+        if (newName.trim() != tunnel.name) tunnelRepository.save(tunnel.renamedTo(newName))
+        clearSelectedTunnels()
     }
 
     fun exportSelectedTunnels(uri: Uri?) = intent {
