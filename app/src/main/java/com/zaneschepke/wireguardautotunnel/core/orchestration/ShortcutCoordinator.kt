@@ -4,6 +4,10 @@ import android.content.Intent
 import com.zaneschepke.wireguardautotunnel.core.shortcut.ShortcutContract
 import com.zaneschepke.wireguardautotunnel.domain.repository.GeneralSettingRepository
 import com.zaneschepke.wireguardautotunnel.domain.repository.TunnelRepository
+import timber.log.Timber
+
+internal fun isUnknownShortcutTunnel(requestedName: String?, found: Boolean): Boolean =
+    !requestedName.isNullOrBlank() && !found
 
 class ShortcutCoordinator(
     private val settingsRepository: GeneralSettingRepository,
@@ -65,14 +69,18 @@ class ShortcutCoordinator(
 
         val tunnelName = intent.getStringExtra(ShortcutContract.EXTRA_TUNNEL_NAME)
 
-        val tunnel =
-            tunnelName?.let { tunnelsRepository.findByTunnelName(it) }
-                ?: tunnelsRepository.getDefaultTunnel()
+        val namedTunnel = tunnelName?.let { tunnelsRepository.findByTunnelName(it) }
+        val tunnel = namedTunnel ?: tunnelsRepository.getDefaultTunnel()
 
         tunnel ?: return
 
         when (intent.action) {
             ShortcutContract.Action.START.name -> {
+                // A renamed or deleted tunnel must not silently start the default one instead
+                if (isUnknownShortcutTunnel(tunnelName, found = namedTunnel != null)) {
+                    Timber.w("Ignoring start shortcut for a tunnel that no longer exists")
+                    return
+                }
                 tunnelCoordinator.startTunnel(config = tunnel)
             }
 
