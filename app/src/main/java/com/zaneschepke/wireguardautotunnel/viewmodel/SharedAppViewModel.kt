@@ -17,6 +17,7 @@ import com.zaneschepke.wireguardautotunnel.core.tunnel.StrictSplitDefaults
 import com.zaneschepke.wireguardautotunnel.domain.enums.TunnelMode
 import com.zaneschepke.wireguardautotunnel.domain.model.TunnelConfig
 import com.zaneschepke.wireguardautotunnel.domain.model.TunnelGroup
+import com.zaneschepke.wireguardautotunnel.domain.model.duplicatedAs
 import com.zaneschepke.wireguardautotunnel.domain.repository.AppStateRepository
 import com.zaneschepke.wireguardautotunnel.domain.repository.GeneralSettingRepository
 import com.zaneschepke.wireguardautotunnel.domain.repository.GlobalEffectRepository
@@ -51,6 +52,7 @@ import com.zaneschepke.wireguardautotunnel.util.extensions.asFileExportName
 import com.zaneschepke.wireguardautotunnel.util.extensions.asStringValue
 import com.zaneschepke.wireguardautotunnel.util.extensions.isFileAccessDenied
 import com.zaneschepke.wireguardautotunnel.util.extensions.saveTunnelsUniquely
+import com.zaneschepke.wireguardautotunnel.util.extensions.uniqueTunnelName
 import com.zaneschepke.wireguardautotunnel.util.network.NetworkUtils
 import io.ktor.client.HttpClient
 import io.ktor.client.request.prepareGet
@@ -828,20 +830,27 @@ class SharedAppViewModel(
     }
 
     fun copySelectedTunnel() = intent {
-        val selected = tunnelsUiState.value.selectedTunnels.firstOrNull() ?: return@intent
-        val config = selected.getConfig()
+        val selectedId = tunnelsUiState.value.selectedTunnels.firstOrNull()?.id ?: return@intent
+        val selected = tunnelRepository.getById(selectedId) ?: return@intent
         val ui = tunnelsUiState.value
         // Placed right after the original, not appended to the end - shift everything after it
         // in the same scope (its group, or root) forward by one to open that slot.
         val (shiftedGroups, shiftedTunnels) =
             shiftForInsertAfter(ui.groups, ui.tunnels, selected.groupId, selected.position)
-        val copy =
-            TunnelConfig.fromConfig(config, selected.name)
-                .copy(groupId = selected.groupId, position = selected.position + 1)
+        // Names are read fresh: the unique index must never be hit with a stale list
+        val name =
+            uniqueTunnelName(selected.name, tunnelRepository.getAll().map { it.name }.toSet())
+        val copy = selected.duplicatedAs(name, position = selected.position + 1)
         tunnelGroupRepository.saveAll(shiftedGroups)
         if (shiftedTunnels.isNotEmpty()) tunnelRepository.updateAll(shiftedTunnels)
-        tunnelRepository.saveTunnelsUniquely(listOf(copy), state.tunnelNames.map { it.value })
+        tunnelRepository.save(copy)
         clearSelectedTunnels()
+        postGlobalSideEffect(
+            GlobalSideEffect.Snackbar(
+                StringValue.StringResource(R.string.tunnel_copied_same_keys),
+                ToastType.Info,
+            ),
+        )
     }
 
     fun exportSelectedTunnels(uri: Uri?) = intent {
